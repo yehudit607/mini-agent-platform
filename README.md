@@ -195,10 +195,20 @@ curl http://localhost:8000/health
 
 All endpoints (except `/health`) require the `X-API-KEY` header.
 
-| Tenant | API Key | Tenant UUID |
-|--------|---------|-------------|
-| A | `tenant-a-key` | `11111111-1111-1111-1111-111111111111` |
-| B | `tenant-b-key` | `22222222-2222-2222-2222-222222222222` |
+**Security Implementation:**
+- API keys are stored as **SHA-256 hashes** 
+- Keys include a **prefix** (e.g., `tenant-a-ke...`) for debugging without exposing the full key
+- **`last_used_at`** timestamp provides audit trail for key usage
+- Keys and tenants support **deactivation** for immediate revocation
+
+**Demo Keys (pre-seeded):**
+
+| Tenant | API Key | Purpose |
+|--------|---------|---------|
+| A | `tenant-a-key` | Production demo key |
+| A | `tenant-a-test-key` | Test key |
+| B | `tenant-b-key` | Production demo key |
+| B | `tenant-b-test-key` | Test key |
 
 ### Endpoints Overview
 
@@ -346,6 +356,8 @@ mini-agent-platform/
 │   ├── exceptions.py        # Custom exception hierarchy
 │   ├── models/              # SQLModel entity definitions
 │   │   ├── base.py          # TenantModel base class
+│   │   ├── tenant.py        # Tenant entity
+│   │   ├── api_key.py       # API key with SHA-256 hashing
 │   │   ├── tool.py
 │   │   ├── agent.py
 │   │   └── execution_log.py
@@ -355,6 +367,7 @@ mini-agent-platform/
 │   │   ├── tool_service.py
 │   │   ├── agent_service.py
 │   │   ├── execution_service.py
+│   │   ├── auth_service.py  # API key validation
 │   │   └── rate_limiter.py  # Redis sliding window implementation
 │   ├── routes/              # API endpoint handlers
 │   ├── middleware/          # Auth & error handling
@@ -386,6 +399,19 @@ The following models are accepted by the `/run` endpoint:
 - `gemini-2.5-pro`
 
 > **Note:** The current implementation uses a Mock LLM adapter for deterministic testing. Replace `MockLLMAdapter` with a real provider integration for production use.
+
+---
+
+## Production Considerations
+
+The following features were intentionally scoped out of this demo but would be essential for production deployment:
+
+| Category | Features |
+|----------|----------|
+| **Observability** | Structured JSON logging, Prometheus metrics, distributed tracing (OpenTelemetry) |
+| **Security** | API key rotation, IP whitelisting per key, comprehensive audit logging |
+| **Scaling** | Async execution queue (Celery/RQ), database read replicas, connection pooling tuning |
+| **Reliability** | Circuit breakers for LLM calls, retry policies with exponential backoff, request timeout enforcement |
 
 ---
 
