@@ -52,7 +52,7 @@ async def test_tenant_cannot_get_other_tenant_tool_by_id(
     response = await client.get(f"/api/v1/tools/{tool_id}", headers=tenant_b_headers)
 
     assert response.status_code == 404
-    assert response.json()["error_code"] == "NOT_FOUND"
+    assert response.json()["error_code"] == "TOOL_NOT_FOUND"
 
 
 @pytest.mark.asyncio
@@ -151,7 +151,7 @@ async def test_tenant_cannot_run_other_tenant_agent(
     tenant_b_headers: dict,
     seed_auth_data,
 ):
-    """Tenant B should not be able to execute Tenant A's agent."""
+    """Tenant B should not be able to execute Tenant A's agent (403 to prevent enumeration)."""
     # Tenant A creates an agent
     create_response = await client.post(
         "/api/v1/agents",
@@ -171,7 +171,8 @@ async def test_tenant_cannot_run_other_tenant_agent(
         headers=tenant_b_headers,
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "TENANT_ISOLATION_VIOLATION"
 
 
 @pytest.mark.asyncio
@@ -202,8 +203,9 @@ async def test_tenant_cannot_assign_other_tenant_tool_to_agent(
         headers=tenant_b_headers,
     )
 
-    # Should fail - tool doesn't belong to B
-    assert response.status_code in [400, 404]
+    # Should fail with 403 - tool doesn't belong to B (prevents enumeration)
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "CROSS_TENANT_TOOL"
 
 
 @pytest.mark.asyncio

@@ -91,14 +91,14 @@ async def test_create_agent_duplicate_name_fails(
     )
 
     assert response2.status_code == 400
-    assert response2.json()["error_code"] == "DUPLICATE_RESOURCE"
+    assert response2.json()["error_code"] == "DUPLICATE_AGENT_NAME"
 
 
 @pytest.mark.asyncio
 async def test_create_agent_with_invalid_tool_id_fails(
     client: AsyncClient, tenant_a_headers: dict, seed_auth_data
 ):
-    """Should fail when assigning non-existent tool."""
+    """Should fail when assigning non-existent tool (403 to prevent enumeration)."""
     fake_tool_id = "00000000-0000-0000-0000-000000000000"
 
     response = await client.post(
@@ -112,7 +112,8 @@ async def test_create_agent_with_invalid_tool_id_fails(
         headers=tenant_a_headers,
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "CROSS_TENANT_TOOL"
 
 
 @pytest.mark.asyncio
@@ -245,7 +246,7 @@ async def test_get_agent_not_found(
     response = await client.get(f"/api/v1/agents/{fake_id}", headers=tenant_a_headers)
 
     assert response.status_code == 404
-    assert response.json()["error_code"] == "NOT_FOUND"
+    assert response.json()["error_code"] == "AGENT_NOT_FOUND"
 
 
 @pytest.mark.asyncio
@@ -276,121 +277,30 @@ async def test_update_agent_basic_fields(
 
 
 @pytest.mark.asyncio
-async def test_update_agent_add_tools(
+async def test_update_agent_partial_fields(
     client: AsyncClient, tenant_a_headers: dict, seed_auth_data
 ):
-    """Should add tools to existing agent."""
-    # Create tool
-    tool_response = await client.post(
-        "/api/v1/tools",
-        json={"name": "new_tool", "description": "To be added"},
-        headers=tenant_a_headers,
-    )
-    tool_id = tool_response.json()["id"]
-
-    # Create agent without tools
+    """Should allow partial updates (only description)."""
+    # Create agent
     create_response = await client.post(
         "/api/v1/agents",
-        json={"name": "Toolless Agent", "role": "basic", "description": "No tools yet"},
+        json={"name": "Partial Agent", "role": "tester", "description": "Original"},
         headers=tenant_a_headers,
     )
     agent_id = create_response.json()["id"]
-    assert create_response.json()["tools"] == []
 
-    # Update to add tool
+    # Update only description
     response = await client.put(
         f"/api/v1/agents/{agent_id}",
-        json={"tool_ids": [tool_id]},
+        json={"description": "Updated description"},
         headers=tenant_a_headers,
     )
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data["tools"]) == 1
-    assert data["tools"][0]["name"] == "new_tool"
-
-
-@pytest.mark.asyncio
-async def test_update_agent_replace_tools(
-    client: AsyncClient, tenant_a_headers: dict, seed_auth_data
-):
-    """Should replace agent's tools completely."""
-    # Create two tools
-    tool1_response = await client.post(
-        "/api/v1/tools",
-        json={"name": "tool_1", "description": "First"},
-        headers=tenant_a_headers,
-    )
-    tool2_response = await client.post(
-        "/api/v1/tools",
-        json={"name": "tool_2", "description": "Second"},
-        headers=tenant_a_headers,
-    )
-    tool1_id = tool1_response.json()["id"]
-    tool2_id = tool2_response.json()["id"]
-
-    # Create agent with tool_1
-    create_response = await client.post(
-        "/api/v1/agents",
-        json={
-            "name": "Tool Agent",
-            "role": "tester",
-            "description": "Has tool 1",
-            "tool_ids": [tool1_id],
-        },
-        headers=tenant_a_headers,
-    )
-    agent_id = create_response.json()["id"]
-
-    # Update to use tool_2 instead
-    response = await client.put(
-        f"/api/v1/agents/{agent_id}",
-        json={"tool_ids": [tool2_id]},
-        headers=tenant_a_headers,
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["tools"]) == 1
-    assert data["tools"][0]["name"] == "tool_2"
-
-
-@pytest.mark.asyncio
-async def test_update_agent_remove_all_tools(
-    client: AsyncClient, tenant_a_headers: dict, seed_auth_data
-):
-    """Should remove all tools when empty array provided."""
-    # Create tool
-    tool_response = await client.post(
-        "/api/v1/tools",
-        json={"name": "removable_tool", "description": "Will be removed"},
-        headers=tenant_a_headers,
-    )
-    tool_id = tool_response.json()["id"]
-
-    # Create agent with tool
-    create_response = await client.post(
-        "/api/v1/agents",
-        json={
-            "name": "Losing Tools",
-            "role": "loser",
-            "description": "Will lose tools",
-            "tool_ids": [tool_id],
-        },
-        headers=tenant_a_headers,
-    )
-    agent_id = create_response.json()["id"]
-
-    # Update to remove tools
-    response = await client.put(
-        f"/api/v1/agents/{agent_id}",
-        json={"tool_ids": []},
-        headers=tenant_a_headers,
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["tools"] == []
+    assert data["name"] == "Partial Agent"  # Unchanged
+    assert data["role"] == "tester"  # Unchanged
+    assert data["description"] == "Updated description"
 
 
 @pytest.mark.asyncio

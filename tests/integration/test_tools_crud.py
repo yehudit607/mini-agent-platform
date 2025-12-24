@@ -43,7 +43,7 @@ async def test_create_tool_duplicate_name_fails(
     )
 
     assert response2.status_code == 400
-    assert response2.json()["error_code"] == "DUPLICATE_RESOURCE"
+    assert response2.json()["error_code"] == "DUPLICATE_TOOL_NAME"
 
 
 @pytest.mark.asyncio
@@ -118,7 +118,7 @@ async def test_get_tool_not_found(
     response = await client.get(f"/api/v1/tools/{fake_id}", headers=tenant_a_headers)
 
     assert response.status_code == 404
-    assert response.json()["error_code"] == "NOT_FOUND"
+    assert response.json()["error_code"] == "TOOL_NOT_FOUND"
 
 
 @pytest.mark.asyncio
