@@ -26,7 +26,9 @@ async def test_invalid_api_key_returns_401(client: AsyncClient, invalid_headers:
 
 
 @pytest.mark.asyncio
-async def test_valid_api_key_returns_200(client: AsyncClient, tenant_a_headers: dict):
+async def test_valid_api_key_returns_200(
+    client: AsyncClient, tenant_a_headers: dict, seed_auth_data
+):
     """Request with valid X-API-KEY should succeed."""
     response = await client.get("/api/v1/tools", headers=tenant_a_headers)
 

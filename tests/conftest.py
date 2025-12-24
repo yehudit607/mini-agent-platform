@@ -1,6 +1,7 @@
 """Pytest fixtures for test configuration."""
 
 import asyncio
+from datetime import datetime, timezone
 from typing import AsyncGenerator, Generator
 from uuid import UUID
 
@@ -15,6 +16,7 @@ from app.config import Settings, get_settings
 from app.database import get_async_session
 from app.main import app
 from app.dependencies import get_current_tenant
+from app.models import Tenant, APIKey
 
 # Test database URL (use SQLite for simplicity in tests)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
@@ -83,6 +85,54 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
     async with async_session_maker() as session:
         yield session
+
+
+@pytest_asyncio.fixture
+async def seed_auth_data(db_session: AsyncSession) -> None:
+    """Seed test tenants and API keys for authentication tests."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Create tenants
+    tenant_a = Tenant(
+        id=TENANT_A_ID,
+        name="Test Tenant A",
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    tenant_b = Tenant(
+        id=TENANT_B_ID,
+        name="Test Tenant B",
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(tenant_a)
+    db_session.add(tenant_b)
+
+    # Create API keys
+    api_key_a = APIKey(
+        id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaab"),
+        tenant_id=TENANT_A_ID,
+        key_hash=APIKey.hash_key(TENANT_A_API_KEY),
+        key_prefix=TENANT_A_API_KEY[:12],
+        name="Test Key A",
+        is_active=True,
+        created_at=now,
+    )
+    api_key_b = APIKey(
+        id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbc"),
+        tenant_id=TENANT_B_ID,
+        key_hash=APIKey.hash_key(TENANT_B_API_KEY),
+        key_prefix=TENANT_B_API_KEY[:12],
+        name="Test Key B",
+        is_active=True,
+        created_at=now,
+    )
+    db_session.add(api_key_a)
+    db_session.add(api_key_b)
+
+    await db_session.commit()
 
 
 @pytest_asyncio.fixture
