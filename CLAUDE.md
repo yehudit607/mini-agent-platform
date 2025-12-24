@@ -2,7 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Spec-Driven Development Workflow
+
+This project uses **Specify** (GitHub Spec Kit) for spec-driven development. Follow this workflow for new features:
+
+### Core Workflow Commands
+
+1. `/speckit.constitution` - Establish/update project principles and governance rules
+2. `/speckit.specify` - Create detailed feature specification (requires constitution first)
+3. `/speckit.plan` - Generate implementation plan from specification
+4. `/speckit.tasks` - Break plan into actionable tasks
+5. `/speckit.implement` - Execute implementation following tasks
+
+### Optional Enhancement Commands
+
+- `/speckit.clarify` - Ask structured questions to de-risk ambiguous areas (run before planning)
+- `/speckit.checklist` - Generate quality checklists for requirements validation (after planning)
+- `/speckit.analyze` - Cross-artifact consistency & alignment report (before implementation)
+
+### Project Structure
+
+- `.specify/memory/constitution.md` - Project constitution defining core principles
+- `.specify/templates/` - Templates for specs, plans, tasks, and checklists
+- `.specify/scripts/` - Automation scripts for common workflows
+- `.claude/commands/` - Custom slash commands for spec-driven workflow
+
+### Recommended Feature Development Flow
+
+1. Review constitution for project principles
+2. Create specification using `/speckit.specify`
+3. Generate implementation plan with `/speckit.plan`
+4. Break into tasks with `/speckit.tasks`
+5. Implement following tasks systematically
+
 ## Build and Development Commands
+
+[To be added as Backend/FastAPI implementation progresses]
 
 # Instructions for LLM: Senior Coding Standards
 
