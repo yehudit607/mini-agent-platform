@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 from typing import Optional
 
@@ -7,7 +8,7 @@ from app.models.agent import Agent
 class MockLLMAdapter:
     """Generates deterministic responses based on agent config and prompt hash."""
 
-    def generate(
+    async def generate(
         self,
         agent: Agent,
         prompt: str,
@@ -15,6 +16,8 @@ class MockLLMAdapter:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> str:
+        # Simulate network latency (realistic for LLM API calls)
+        await asyncio.sleep(0.05)
         tool_names = [link.tool.name for link in agent.tool_links]
         tools_str = ", ".join(tool_names) if tool_names else "none"
 

@@ -51,7 +51,7 @@ class ExecutionService:
                 },
             )
 
-        response_text = mock_llm_adapter.generate(
+        response_text = await mock_llm_adapter.generate(
             agent=agent,
             prompt=data.prompt,
             model=data.model,
