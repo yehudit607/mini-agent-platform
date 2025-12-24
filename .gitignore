@@ -65,3 +65,8 @@ Thumbs.db
 
 # Alembic
 alembic/versions/*.pyc
+
+# Claude
+.claude/
+CLAUDE.md
+.specify/
