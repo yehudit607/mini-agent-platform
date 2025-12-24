@@ -6,6 +6,7 @@ Create Date: 2025-12-24
 
 """
 import hashlib
+from datetime import datetime, timezone
 from typing import Sequence, Union
 from uuid import UUID
 
@@ -23,6 +24,10 @@ TENANT_B_ID = "22222222-2222-2222-2222-222222222222"
 
 def hash_key(plain_key: str) -> str:
     return hashlib.sha256(plain_key.encode()).hexdigest()
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def upgrade() -> None:
@@ -62,6 +67,7 @@ def upgrade() -> None:
         sa.column("updated_at", sa.DateTime()),
     )
 
+    now = utcnow()
     op.bulk_insert(
         tenants_table,
         [
@@ -69,15 +75,15 @@ def upgrade() -> None:
                 "id": TENANT_A_ID,
                 "name": "Demo Tenant A",
                 "is_active": True,
-                "created_at": sa.func.now(),
-                "updated_at": sa.func.now(),
+                "created_at": now,
+                "updated_at": now,
             },
             {
                 "id": TENANT_B_ID,
                 "name": "Demo Tenant B",
                 "is_active": True,
-                "created_at": sa.func.now(),
-                "updated_at": sa.func.now(),
+                "created_at": now,
+                "updated_at": now,
             },
         ],
     )
@@ -105,7 +111,7 @@ def upgrade() -> None:
                 "key_prefix": "tenant-a-ke",
                 "name": "Demo Key A",
                 "is_active": True,
-                "created_at": sa.func.now(),
+                "created_at": now,
                 "last_used_at": None,
             },
             {
@@ -115,7 +121,7 @@ def upgrade() -> None:
                 "key_prefix": "tenant-a-te",
                 "name": "Test Key A",
                 "is_active": True,
-                "created_at": sa.func.now(),
+                "created_at": now,
                 "last_used_at": None,
             },
             {
@@ -125,7 +131,7 @@ def upgrade() -> None:
                 "key_prefix": "tenant-b-ke",
                 "name": "Demo Key B",
                 "is_active": True,
-                "created_at": sa.func.now(),
+                "created_at": now,
                 "last_used_at": None,
             },
             {
@@ -135,7 +141,7 @@ def upgrade() -> None:
                 "key_prefix": "tenant-b-te",
                 "name": "Test Key B",
                 "is_active": True,
-                "created_at": sa.func.now(),
+                "created_at": now,
                 "last_used_at": None,
             },
         ],
