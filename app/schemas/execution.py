@@ -24,6 +24,18 @@ class ExecutionRequest(BaseModel):
         ...,
         description="The model to use for execution",
     )
+    temperature: Optional[float] = Field(
+        default=0.7,
+        ge=0.0,
+        le=2.0,
+        description="Controls randomness (0.0=deterministic, 2.0=creative)",
+    )
+    max_tokens: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=4096,
+        description="Maximum tokens in response (None=model default)",
+    )
 
     @field_validator("model")
     @classmethod

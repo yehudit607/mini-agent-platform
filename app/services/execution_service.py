@@ -55,6 +55,8 @@ class ExecutionService:
             agent=agent,
             prompt=data.prompt,
             model=data.model,
+            temperature=data.temperature,
+            max_tokens=data.max_tokens,
         )
 
         log = await self.log_repository.create(
