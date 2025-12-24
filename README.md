@@ -275,9 +275,15 @@ curl -X POST http://localhost:8000/api/v1/agents/{agent_id}/run \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Find the latest trends in AI agent frameworks",
-    "model": "gpt-5"
+    "model": "gpt-5",
+    "temperature": 0.7,
+    "max_tokens": 1000
   }'
 ```
+
+**Optional Parameters:**
+- `temperature` (0.0-2.0, default: 0.7) - Controls randomness
+- `max_tokens` (1-4096, optional) - Limits response length
 
 **Response Headers:**
 ```
@@ -294,7 +300,7 @@ X-RateLimit-Window: 60
   "agent_name": "Research Assistant",
   "model": "gpt-5",
   "prompt": "Find the latest trends in AI agent frameworks",
-  "response": "[Mock Response] Agent 'Research Assistant' (role: researcher)...",
+  "response": "[Mock Response] Agent 'Research Assistant' (role: researcher) processed your request using tools: [web_search]... [temp=0.7, max_tokens=1000]",
   "tools_available": ["web_search"],
   "executed_at": "2024-01-15T10:35:00Z"
 }
