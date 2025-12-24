@@ -7,7 +7,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A production-ready, multi-tenant backend platform for managing and executing AI Agents. Built with **FastAPI**, **async PostgreSQL**, and **Redis**, designed for horizontal scalability and strict tenant isolation.
+A multi-tenant backend platform for managing and executing AI Agents. Built with **FastAPI**, **async PostgreSQL**, and **Redis**, designed for horizontal scalability and strict tenant isolation.
 
 ---
 
@@ -84,58 +84,6 @@ flowchart TB
     H & I & J -->|Async Queries| K
     D -->|Sliding Window| L
 ```
-
-### Agent Execution Flow
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant FastAPI
-    participant AuthMiddleware
-    participant RateLimiter
-    participant ExecutionService
-    participant AgentService
-    participant MockLLM
-    participant PostgreSQL
-    participant Redis
-
-    Client->>FastAPI: POST /api/v1/agents/{id}/run
-    FastAPI->>AuthMiddleware: Validate X-API-KEY
-    AuthMiddleware->>AuthMiddleware: Extract tenant_id from registry
-
-    alt Invalid API Key
-        AuthMiddleware-->>Client: 401 Unauthorized
-    end
-
-    AuthMiddleware->>RateLimiter: check_and_consume(tenant_id)
-    RateLimiter->>Redis: Execute Lua Script (atomic)
-    Redis-->>RateLimiter: {allowed, remaining, retry_after}
-
-    alt Rate Limit Exceeded
-        RateLimiter-->>Client: 429 Too Many Requests
-    end
-
-    RateLimiter->>ExecutionService: execute_agent()
-    ExecutionService->>AgentService: get_agent_or_forbidden(tenant_id, agent_id)
-    AgentService->>PostgreSQL: SELECT with tenant_id filter
-
-    alt Agent Not Found / Wrong Tenant
-        AgentService-->>Client: 403 Forbidden
-    end
-
-    PostgreSQL-->>AgentService: Agent + Tools
-    AgentService-->>ExecutionService: Agent entity
-
-    ExecutionService->>MockLLM: generate(agent, prompt, model)
-    MockLLM-->>ExecutionService: Deterministic response
-
-    ExecutionService->>PostgreSQL: INSERT execution_log
-    PostgreSQL-->>ExecutionService: Log ID
-
-    ExecutionService-->>Client: ExecutionResponse + Rate Limit Headers
-```
-
 ---
 
 ## Key Design Decisions
@@ -176,14 +124,6 @@ if count < limit then
 end
 ```
 
-**Why Redis + Lua over alternatives?**
-
-| Alternative | Why Not |
-|-------------|---------|
-| In-memory (per-process) | Doesn't scale horizontally; each instance has separate counters |
-| Database-based | Higher latency; adds load to primary datastore |
-| Token bucket | More complex; sliding window provides fairer burst handling |
-
 **Why Lua scripts?**
 - **Atomicity**: All operations execute in a single Redis transaction
 - **No race conditions**: Concurrent requests can't read stale counts
@@ -209,22 +149,6 @@ Routes (HTTP) → Services (Business Logic) → Repositories (Data Access)
 - **Testability**: Services can be unit tested with mocked repositories
 - **Flexibility**: Swap PostgreSQL for another DB by changing only repositories
 - **Maintainability**: Business logic changes don't touch HTTP layer
-
----
-
-### 4. Security: 403 vs 404 for Tenant Isolation
-
-```python
-async def get_agent_or_forbidden(self, tenant_id: UUID, agent_id: UUID) -> Agent:
-    """Returns 403 instead of 404 to prevent tenant resource enumeration."""
-```
-
-**Why 403 Forbidden instead of 404 Not Found?**
-
-Returning `404` for cross-tenant access attempts would allow attackers to enumerate valid resource IDs across all tenants. By consistently returning `403`, we:
-- Prevent information disclosure about resource existence
-- Make brute-force enumeration attacks ineffective
-- Maintain consistent security posture
 
 ---
 
