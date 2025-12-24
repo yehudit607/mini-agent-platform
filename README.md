@@ -265,7 +265,7 @@ curl -X POST http://localhost:8000/api/v1/agents/{agent_id}/run \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Find the latest trends in AI agent frameworks",
-    "model": "gpt-4o"
+    "model": "gpt-5"
   }'
 ```
 
@@ -282,7 +282,7 @@ X-RateLimit-Window: 60
   "execution_id": "...",
   "agent_id": "...",
   "agent_name": "Research Assistant",
-  "model": "gpt-4o",
+  "model": "gpt-5",
   "prompt": "Find the latest trends in AI agent frameworks",
   "response": "[Mock Response] Agent 'Research Assistant' (role: researcher)...",
   "tools_available": ["web_search"],
@@ -378,11 +378,12 @@ mini-agent-platform/
 
 The following models are accepted by the `/run` endpoint:
 
-- `gpt-4o`
-- `gpt-4`
+- `gpt-4o-mini`
+- `gpt-5`
 - `gpt-3.5-turbo`
-- `claude-3-opus`
-- `claude-3-sonnet`
+- `claude-4-opus`
+- `claude-4.5-sonnet`
+- `gemini-2.5-pro`
 
 > **Note:** The current implementation uses a Mock LLM adapter for deterministic testing. Replace `MockLLMAdapter` with a real provider integration for production use.
 

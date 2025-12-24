@@ -31,11 +31,12 @@ class Settings(BaseSettings):
     max_page_limit: int = 100
 
     allowed_models: List[str] = [
-        "gpt-4o",
-        "gpt-4",
+        "gpt-5",
+        "gpt-4o-mini",
         "gpt-3.5-turbo",
-        "claude-3-opus",
-        "claude-3-sonnet",
+        "claude-4-opus",
+        "claude-4.5-sonnet",
+        "gemini-2.5 pro",
     ]
 
 
