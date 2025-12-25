@@ -78,8 +78,8 @@ class RedisRateLimitBackend(RateLimitBackend):
                     decode_responses=True,
                 )
                 await self._client.ping()
-            except Exception as e:
-                logger.error(f"Redis connection failed: {str(e)}")
+            except Exception:
+                logger.exception("Redis connection failed")
                 raise ServiceUnavailableError(
                     error_code="SERVICE_UNAVAILABLE",
                     message="Rate limiting service temporarily unavailable",
@@ -116,8 +116,8 @@ class RedisRateLimitBackend(RateLimitBackend):
 
         except ServiceUnavailableError:
             raise
-        except Exception as e:
-            logger.error(f"Redis rate limit error: {str(e)}")
+        except Exception:
+            logger.exception("Redis rate limit error")
             raise ServiceUnavailableError(
                 error_code="SERVICE_UNAVAILABLE",
                 message="Rate limiting service temporarily unavailable",
@@ -145,8 +145,8 @@ class RedisRateLimitBackend(RateLimitBackend):
 
             return max(0, int(remaining))
 
-        except Exception as e:
-            logger.error(f"Redis get_remaining error: {str(e)}")
+        except Exception:
+            logger.exception("Redis get_remaining error")
             return 0  # Fail safe - report 0 remaining
 
     async def close(self) -> None:

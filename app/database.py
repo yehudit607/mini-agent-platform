@@ -5,8 +5,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
 from app.config import get_settings
+from app.logging_config import setup_logger
 
 settings = get_settings()
+logger = setup_logger(__name__)
 
 engine = create_async_engine(
     settings.database_url,
@@ -32,6 +34,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             yield session
             await session.commit()
         except Exception:
+            logger.exception("Database transaction failed, rolling back")
             await session.rollback()
             raise
         finally:
