@@ -2,10 +2,11 @@ import asyncio
 import hashlib
 from typing import Optional
 
+from app.adapters.llm_provider import LLMProvider
 from app.models.agent import Agent
 
 
-class MockLLMAdapter:
+class MockLLMAdapter(LLMProvider):
     """Generates deterministic responses based on agent config and prompt hash."""
 
     async def generate(
@@ -48,6 +49,3 @@ class MockLLMAdapter:
             )
 
         return response
-
-
-mock_llm_adapter = MockLLMAdapter()

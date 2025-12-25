@@ -1,27 +1,38 @@
-from datetime import datetime
-from typing import Optional
+"""Agent execution service."""
+
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.mock_llm import mock_llm_adapter
+from app.adapters.llm_provider import LLMProvider
 from app.config import get_settings
 from app.exceptions import RateLimitExceededError, ValidationError
 from app.logging_config import setup_logger
-from app.models.agent import Agent
-from app.models.execution_log import ExecutionLog
 from app.repositories.execution_log_repository import ExecutionLogRepository
 from app.schemas.execution import ExecutionRequest, ExecutionResponse
 from app.services.agent_service import AgentService
-from app.services.rate_limiter import get_rate_limiter
+from app.services.rate_limiter import RateLimiter
 
 settings = get_settings()
 logger = setup_logger(__name__)
 
 
 class ExecutionService:
-    def __init__(self, session: AsyncSession):
+    """Service for executing agent prompts.
+
+    Uses Dependency Injection for LLMProvider and RateLimiter,
+    enabling easy testing and swapping implementations.
+    """
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        llm_provider: LLMProvider,
+        rate_limiter: RateLimiter,
+    ):
         self.session = session
+        self.llm_provider = llm_provider
+        self.rate_limiter = rate_limiter
         self.agent_service = AgentService(session)
         self.log_repository = ExecutionLogRepository(session)
 
@@ -31,8 +42,7 @@ class ExecutionService:
         agent_id: UUID,
         data: ExecutionRequest,
     ) -> ExecutionResponse:
-        rate_limiter = await get_rate_limiter()
-        rate_result = await rate_limiter.check_and_consume(tenant_id)
+        rate_result = await self.rate_limiter.check_and_consume(tenant_id)
 
         if not rate_result.allowed:
             raise RateLimitExceededError(
@@ -58,7 +68,7 @@ class ExecutionService:
             f"agent_id={agent_id}, agent_name={agent.name}, model={data.model}"
         )
 
-        response_text = await mock_llm_adapter.generate(
+        response_text = await self.llm_provider.generate(
             agent=agent,
             prompt=data.prompt,
             model=data.model,
@@ -98,3 +108,7 @@ class ExecutionService:
             warning=warning,
             executed_at=log.created_at,
         )
+
+    async def get_remaining_rate_limit(self, tenant_id: UUID) -> int:
+        """Get remaining rate limit tokens for response headers."""
+        return await self.rate_limiter.get_remaining(tenant_id)

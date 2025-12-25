@@ -5,6 +5,7 @@ import pytest
 from uuid import uuid4
 from unittest.mock import MagicMock
 
+from app.adapters.llm_provider import LLMProvider
 from app.adapters.mock_llm import MockLLMAdapter
 
 
@@ -215,3 +216,8 @@ class TestMockLLMAdapter:
         assert len(results) == 2
         assert "Agent1" in results[0]
         assert "Agent2" in results[1]
+
+    def test_implements_llm_provider_interface(self):
+        """MockLLMAdapter implements LLMProvider interface."""
+        adapter = MockLLMAdapter()
+        assert isinstance(adapter, LLMProvider)

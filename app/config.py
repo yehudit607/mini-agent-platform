@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         "gpt-3.5-turbo",
         "claude-4-opus",
         "claude-4.5-sonnet",
-        "gemini-2.5 pro",
+        "gemini-2.5-pro",
     ]
 
 

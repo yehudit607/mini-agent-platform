@@ -1,23 +1,33 @@
+"""Agent execution route."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.llm_provider import LLMProvider
 from app.config import get_settings
 from app.database import get_async_session
-from app.dependencies import get_current_tenant
+from app.dependencies import get_current_tenant, get_llm_provider
 from app.schemas.execution import ExecutionRequest, ExecutionResponse
 from app.services.execution_service import ExecutionService
-from app.services.rate_limiter import get_rate_limiter
+from app.services.rate_limiter import RateLimiter, get_rate_limiter
 
 settings = get_settings()
 router = APIRouter()
 
 
-def get_execution_service(
+async def get_execution_service(
     session: AsyncSession = Depends(get_async_session),
+    llm_provider: LLMProvider = Depends(get_llm_provider),
+    rate_limiter: RateLimiter = Depends(get_rate_limiter),
 ) -> ExecutionService:
-    return ExecutionService(session)
+    """Dependency factory for ExecutionService with all dependencies injected."""
+    return ExecutionService(
+        session=session,
+        llm_provider=llm_provider,
+        rate_limiter=rate_limiter,
+    )
 
 
 @router.post(
@@ -34,11 +44,11 @@ async def execute_agent(
 ) -> ExecutionResponse:
     result = await service.execute_agent(tenant_id, agent_id, data)
 
-    rate_limiter = await get_rate_limiter()
-    rate_result = await rate_limiter.check_and_consume(tenant_id)
+    # Get remaining rate limit for headers (without consuming another token)
+    remaining = await service.get_remaining_rate_limit(tenant_id)
 
     response.headers["X-RateLimit-Limit"] = str(settings.rate_limit_requests)
-    response.headers["X-RateLimit-Remaining"] = str(max(0, rate_result.remaining))
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
     response.headers["X-RateLimit-Window"] = str(settings.rate_limit_window_seconds)
 
     return result
