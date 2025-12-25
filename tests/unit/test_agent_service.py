@@ -14,11 +14,6 @@ class TestAgentService:
     """Tests for AgentService business logic."""
 
     @pytest.fixture
-    def mock_session(self):
-        """Create mock database session."""
-        return MagicMock()
-
-    @pytest.fixture
     def mock_agent_repository(self):
         """Create mock AgentRepository."""
         repo = MagicMock()
@@ -65,7 +60,7 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_create_agent_success(
-        self, mock_session, mock_agent_repository, mock_tool_repository
+        self, mock_agent_repository, mock_tool_repository
     ):
         """create_agent creates agent with valid data."""
         tenant_id = uuid4()
@@ -76,9 +71,7 @@ class TestAgentService:
         mock_tool_repository.get_by_id.return_value = tool
         mock_agent_repository.create.return_value = agent
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
-        service.tool_repository = mock_tool_repository
+        service = AgentService(mock_agent_repository, mock_tool_repository)
 
         data = AgentCreate(
             name="New Agent",
@@ -96,16 +89,14 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_create_agent_duplicate_name(
-        self, mock_session, mock_agent_repository, mock_tool_repository
+        self, mock_agent_repository, mock_tool_repository
     ):
         """create_agent raises DuplicateError for existing name."""
         tenant_id = uuid4()
         existing_agent = self.create_mock_agent(name="Existing Agent")
         mock_agent_repository.get_by_name.return_value = existing_agent
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
-        service.tool_repository = mock_tool_repository
+        service = AgentService(mock_agent_repository, mock_tool_repository)
 
         data = AgentCreate(
             name="Existing Agent",
@@ -123,7 +114,7 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_create_agent_cross_tenant_tool(
-        self, mock_session, mock_agent_repository, mock_tool_repository
+        self, mock_agent_repository, mock_tool_repository
     ):
         """create_agent raises ForbiddenError for tool from another tenant."""
         tenant_id = uuid4()
@@ -132,9 +123,7 @@ class TestAgentService:
         # Tool not found (belongs to another tenant)
         mock_tool_repository.get_by_id.return_value = None
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
-        service.tool_repository = mock_tool_repository
+        service = AgentService(mock_agent_repository, mock_tool_repository)
 
         data = AgentCreate(
             name="Agent",
@@ -151,7 +140,7 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_create_agent_validates_all_tools(
-        self, mock_session, mock_agent_repository, mock_tool_repository
+        self, mock_agent_repository, mock_tool_repository
     ):
         """create_agent validates all tools before creation."""
         tenant_id = uuid4()
@@ -172,9 +161,7 @@ class TestAgentService:
 
         mock_tool_repository.get_by_id.side_effect = mock_get_tool
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
-        service.tool_repository = mock_tool_repository
+        service = AgentService(mock_agent_repository, mock_tool_repository)
 
         data = AgentCreate(
             name="Agent",
@@ -187,7 +174,7 @@ class TestAgentService:
             await service.create_agent(tenant_id, data)
 
     @pytest.mark.asyncio
-    async def test_get_agent_success(self, mock_session, mock_agent_repository):
+    async def test_get_agent_success(self, mock_agent_repository):
         """get_agent returns agent by ID."""
         tenant_id = uuid4()
         agent_id = uuid4()
@@ -195,8 +182,7 @@ class TestAgentService:
 
         mock_agent_repository.get_by_id.return_value = agent
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         result = await service.get_agent(tenant_id, agent_id)
 
@@ -204,15 +190,14 @@ class TestAgentService:
         mock_agent_repository.get_by_id.assert_called_once_with(tenant_id, agent_id)
 
     @pytest.mark.asyncio
-    async def test_get_agent_not_found(self, mock_session, mock_agent_repository):
+    async def test_get_agent_not_found(self, mock_agent_repository):
         """get_agent raises NotFoundError when agent doesn't exist."""
         tenant_id = uuid4()
         agent_id = uuid4()
 
         mock_agent_repository.get_by_id.return_value = None
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         with pytest.raises(NotFoundError) as exc_info:
             await service.get_agent(tenant_id, agent_id)
@@ -221,7 +206,7 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_get_agent_for_execution_returns_403(
-        self, mock_session, mock_agent_repository
+        self, mock_agent_repository
     ):
         """get_agent_for_execution returns ForbiddenError instead of NotFoundError."""
         tenant_id = uuid4()
@@ -229,8 +214,7 @@ class TestAgentService:
 
         mock_agent_repository.get_by_id.return_value = None
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         with pytest.raises(ForbiddenError) as exc_info:
             await service.get_agent_for_execution(tenant_id, agent_id)
@@ -239,14 +223,13 @@ class TestAgentService:
         assert "another tenant" in exc_info.value.message
 
     @pytest.mark.asyncio
-    async def test_list_agents_all(self, mock_session, mock_agent_repository):
+    async def test_list_agents_all(self, mock_agent_repository):
         """list_agents returns all agents when no filter."""
         tenant_id = uuid4()
         agents = [self.create_mock_agent() for _ in range(3)]
         mock_agent_repository.list_all.return_value = agents
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         result = await service.list_agents(tenant_id)
 
@@ -255,15 +238,14 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_list_agents_by_tool_name(
-        self, mock_session, mock_agent_repository
+        self, mock_agent_repository
     ):
         """list_agents filters by tool name."""
         tenant_id = uuid4()
         agents = [self.create_mock_agent()]
         mock_agent_repository.list_by_tool_name.return_value = agents
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         result = await service.list_agents(tenant_id, tool_name="search")
 
@@ -274,7 +256,7 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_update_agent_success(
-        self, mock_session, mock_agent_repository, mock_tool_repository
+        self, mock_agent_repository, mock_tool_repository
     ):
         """update_agent updates agent fields."""
         tenant_id = uuid4()
@@ -285,9 +267,7 @@ class TestAgentService:
         mock_agent_repository.get_by_id.return_value = existing_agent
         mock_agent_repository.update.return_value = updated_agent
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
-        service.tool_repository = mock_tool_repository
+        service = AgentService(mock_agent_repository, mock_tool_repository)
 
         data = AgentUpdate(name="New Name", role="worker")
         result = await service.update_agent(tenant_id, agent_id, data)
@@ -297,7 +277,7 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_update_agent_duplicate_name(
-        self, mock_session, mock_agent_repository, mock_tool_repository
+        self, mock_agent_repository, mock_tool_repository
     ):
         """update_agent raises DuplicateError for conflicting name."""
         tenant_id = uuid4()
@@ -315,9 +295,7 @@ class TestAgentService:
         mock_agent_repository.get_by_id.side_effect = mock_get_by_id
         mock_agent_repository.get_by_name.return_value = other_agent
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
-        service.tool_repository = mock_tool_repository
+        service = AgentService(mock_agent_repository, mock_tool_repository)
 
         data = AgentUpdate(name="Agent2")  # Conflicts with other_agent
 
@@ -328,7 +306,7 @@ class TestAgentService:
 
     @pytest.mark.asyncio
     async def test_update_agent_validates_tools(
-        self, mock_session, mock_agent_repository, mock_tool_repository
+        self, mock_agent_repository, mock_tool_repository
     ):
         """update_agent validates new tools."""
         tenant_id = uuid4()
@@ -339,9 +317,7 @@ class TestAgentService:
         mock_agent_repository.get_by_id.return_value = existing_agent
         mock_tool_repository.get_by_id.return_value = None  # Tool doesn't exist
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
-        service.tool_repository = mock_tool_repository
+        service = AgentService(mock_agent_repository, mock_tool_repository)
 
         data = AgentUpdate(tool_ids=[tool_id])
 
@@ -351,7 +327,7 @@ class TestAgentService:
         assert exc_info.value.error_code == "CROSS_TENANT_TOOL"
 
     @pytest.mark.asyncio
-    async def test_delete_agent_success(self, mock_session, mock_agent_repository):
+    async def test_delete_agent_success(self, mock_agent_repository):
         """delete_agent removes agent."""
         tenant_id = uuid4()
         agent_id = uuid4()
@@ -360,30 +336,28 @@ class TestAgentService:
         mock_agent_repository.get_by_id.return_value = agent
         mock_agent_repository.delete.return_value = True
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         await service.delete_agent(tenant_id, agent_id)
 
         mock_agent_repository.delete.assert_called_once_with(tenant_id, agent_id)
 
     @pytest.mark.asyncio
-    async def test_delete_agent_not_found(self, mock_session, mock_agent_repository):
+    async def test_delete_agent_not_found(self, mock_agent_repository):
         """delete_agent raises NotFoundError when agent doesn't exist."""
         tenant_id = uuid4()
         agent_id = uuid4()
 
         mock_agent_repository.get_by_id.return_value = None
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         with pytest.raises(NotFoundError):
             await service.delete_agent(tenant_id, agent_id)
 
     @pytest.mark.asyncio
     async def test_delete_agent_repository_fails(
-        self, mock_session, mock_agent_repository
+        self, mock_agent_repository
     ):
         """delete_agent raises NotFoundError when repository delete fails."""
         tenant_id = uuid4()
@@ -393,8 +367,7 @@ class TestAgentService:
         mock_agent_repository.get_by_id.return_value = agent
         mock_agent_repository.delete.return_value = False
 
-        service = AgentService(mock_session)
-        service.repository = mock_agent_repository
+        service = AgentService(mock_agent_repository, MagicMock())
 
         with pytest.raises(NotFoundError):
             await service.delete_agent(tenant_id, agent_id)

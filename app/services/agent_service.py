@@ -2,7 +2,6 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DuplicateError, NotFoundError, ForbiddenError
 from app.models.agent import Agent
@@ -12,10 +11,21 @@ from app.schemas.agent import AgentCreate, AgentUpdate
 
 
 class AgentService:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-        self.repository = AgentRepository(session)
-        self.tool_repository = ToolRepository(session)
+    """Service for agent CRUD operations with tenant isolation."""
+
+    def __init__(
+        self,
+        agent_repository: AgentRepository,
+        tool_repository: ToolRepository,
+    ):
+        """Initialize with injected repositories.
+
+        Args:
+            agent_repository: Repository for agent data access.
+            tool_repository: Repository for tool validation.
+        """
+        self.repository = agent_repository
+        self.tool_repository = tool_repository
 
     async def create_agent(self, tenant_id: UUID, data: AgentCreate) -> Agent:
         existing = await self.repository.get_by_name(tenant_id, data.name)

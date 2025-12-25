@@ -2,19 +2,13 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_async_session
-from app.dependencies import get_current_tenant
+from app.dependencies import get_agent_service, get_current_tenant
 from app.schemas.agent import AgentCreate, AgentUpdate, AgentResponse, AgentListResponse
 from app.schemas.tool import ToolResponse
 from app.services.agent_service import AgentService
 
 router = APIRouter()
-
-
-def get_agent_service(session: AsyncSession = Depends(get_async_session)) -> AgentService:
-    return AgentService(session)
 
 
 def agent_to_response(agent) -> AgentResponse:

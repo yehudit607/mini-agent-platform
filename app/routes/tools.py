@@ -2,18 +2,12 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_async_session
-from app.dependencies import get_current_tenant
+from app.dependencies import get_current_tenant, get_tool_service
 from app.schemas.tool import ToolCreate, ToolUpdate, ToolResponse, ToolListResponse
 from app.services.tool_service import ToolService
 
 router = APIRouter()
-
-
-def get_tool_service(session: AsyncSession = Depends(get_async_session)) -> ToolService:
-    return ToolService(session)
 
 
 @router.post(

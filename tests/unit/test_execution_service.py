@@ -15,11 +15,6 @@ class TestExecutionService:
     """Tests for ExecutionService with mocked dependencies."""
 
     @pytest.fixture
-    def mock_session(self):
-        """Create mock database session."""
-        return MagicMock()
-
-    @pytest.fixture
     def mock_llm_provider(self):
         """Create mock LLM provider."""
         provider = MagicMock()
@@ -33,7 +28,6 @@ class TestExecutionService:
         limiter.check_and_consume = AsyncMock(
             return_value=RateLimitResult(allowed=True, remaining=99, retry_after=0)
         )
-        limiter.get_remaining = AsyncMock(return_value=99)
         return limiter
 
     @pytest.fixture
@@ -77,13 +71,12 @@ class TestExecutionService:
     @pytest.mark.asyncio
     async def test_execute_agent_success(
         self,
-        mock_session,
         mock_llm_provider,
         mock_rate_limiter,
         mock_agent_service,
         mock_log_repository,
     ):
-        """execute_agent returns response for valid request."""
+        """execute_agent returns response and remaining rate limit for valid request."""
         tenant_id = uuid4()
         agent_id = uuid4()
         agent = self.create_mock_agent(tools=["search", "calculator"])
@@ -92,12 +85,12 @@ class TestExecutionService:
         mock_agent_service.get_agent_for_execution.return_value = agent
         mock_log_repository.create.return_value = execution_log
 
-        service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
-        service.agent_service = mock_agent_service
-        service.log_repository = mock_log_repository
+        service = ExecutionService(
+            mock_agent_service, mock_log_repository, mock_llm_provider, mock_rate_limiter
+        )
 
         request = ExecutionRequest(prompt="Test prompt", model="gpt-4o-mini")
-        result = await service.execute_agent(tenant_id, agent_id, request)
+        result, remaining = await service.execute_agent(tenant_id, agent_id, request)
 
         assert result.execution_id == execution_log.id
         assert result.agent_id == agent.id
@@ -105,13 +98,16 @@ class TestExecutionService:
         assert result.response == "Mock LLM response"
         assert result.tools_available == ["search", "calculator"]
         assert result.warning is None
+        assert remaining == 99
 
     @pytest.mark.asyncio
     async def test_execute_agent_checks_rate_limit(
-        self, mock_session, mock_llm_provider, mock_rate_limiter
+        self, mock_llm_provider, mock_rate_limiter, mock_agent_service, mock_log_repository
     ):
         """execute_agent checks rate limit before execution."""
-        service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
+        service = ExecutionService(
+            mock_agent_service, mock_log_repository, mock_llm_provider, mock_rate_limiter
+        )
         tenant_id = uuid4()
         agent_id = uuid4()
         request = ExecutionRequest(prompt="Test", model="gpt-4o-mini")
@@ -130,14 +126,16 @@ class TestExecutionService:
 
     @pytest.mark.asyncio
     async def test_execute_agent_rate_limit_exceeded(
-        self, mock_session, mock_llm_provider, mock_rate_limiter
+        self, mock_llm_provider, mock_rate_limiter, mock_agent_service, mock_log_repository
     ):
         """execute_agent raises RateLimitExceededError when limit exceeded."""
         mock_rate_limiter.check_and_consume.return_value = RateLimitResult(
             allowed=False, remaining=0, retry_after=30
         )
 
-        service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
+        service = ExecutionService(
+            mock_agent_service, mock_log_repository, mock_llm_provider, mock_rate_limiter
+        )
         tenant_id = uuid4()
         agent_id = uuid4()
         request = ExecutionRequest(prompt="Test", model="gpt-4o-mini")
@@ -150,7 +148,6 @@ class TestExecutionService:
     @pytest.mark.asyncio
     async def test_execute_agent_calls_llm_provider(
         self,
-        mock_session,
         mock_llm_provider,
         mock_rate_limiter,
         mock_agent_service,
@@ -163,9 +160,9 @@ class TestExecutionService:
         mock_agent_service.get_agent_for_execution.return_value = agent
         mock_log_repository.create.return_value = execution_log
 
-        service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
-        service.agent_service = mock_agent_service
-        service.log_repository = mock_log_repository
+        service = ExecutionService(
+            mock_agent_service, mock_log_repository, mock_llm_provider, mock_rate_limiter
+        )
 
         request = ExecutionRequest(
             prompt="Test prompt",
@@ -187,7 +184,6 @@ class TestExecutionService:
     @pytest.mark.asyncio
     async def test_execute_agent_creates_execution_log(
         self,
-        mock_session,
         mock_llm_provider,
         mock_rate_limiter,
         mock_agent_service,
@@ -202,9 +198,9 @@ class TestExecutionService:
         mock_agent_service.get_agent_for_execution.return_value = agent
         mock_log_repository.create.return_value = execution_log
 
-        service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
-        service.agent_service = mock_agent_service
-        service.log_repository = mock_log_repository
+        service = ExecutionService(
+            mock_agent_service, mock_log_repository, mock_llm_provider, mock_rate_limiter
+        )
 
         request = ExecutionRequest(prompt="Test prompt", model="gpt-4o-mini")
         await service.execute_agent(tenant_id, agent_id, request)
@@ -220,7 +216,6 @@ class TestExecutionService:
     @pytest.mark.asyncio
     async def test_execute_agent_warning_for_no_tools(
         self,
-        mock_session,
         mock_llm_provider,
         mock_rate_limiter,
         mock_agent_service,
@@ -233,26 +228,40 @@ class TestExecutionService:
         mock_agent_service.get_agent_for_execution.return_value = agent
         mock_log_repository.create.return_value = execution_log
 
-        service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
-        service.agent_service = mock_agent_service
-        service.log_repository = mock_log_repository
+        service = ExecutionService(
+            mock_agent_service, mock_log_repository, mock_llm_provider, mock_rate_limiter
+        )
 
         request = ExecutionRequest(prompt="Test", model="gpt-4o-mini")
-        result = await service.execute_agent(uuid4(), uuid4(), request)
+        result, remaining = await service.execute_agent(uuid4(), uuid4(), request)
 
         assert result.warning is not None
         assert "no tools configured" in result.warning
         assert result.tools_available == []
 
     @pytest.mark.asyncio
-    async def test_get_remaining_rate_limit(
-        self, mock_session, mock_llm_provider, mock_rate_limiter
+    async def test_execute_agent_returns_rate_limit_remaining(
+        self,
+        mock_llm_provider,
+        mock_rate_limiter,
+        mock_agent_service,
+        mock_log_repository,
     ):
-        """get_remaining_rate_limit delegates to rate limiter."""
-        service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
-        tenant_id = uuid4()
+        """execute_agent returns remaining rate limit tokens."""
+        agent = self.create_mock_agent()
+        execution_log = self.create_mock_execution_log()
 
-        remaining = await service.get_remaining_rate_limit(tenant_id)
+        mock_agent_service.get_agent_for_execution.return_value = agent
+        mock_log_repository.create.return_value = execution_log
+        mock_rate_limiter.check_and_consume.return_value = RateLimitResult(
+            allowed=True, remaining=42, retry_after=0
+        )
 
-        assert remaining == 99
-        mock_rate_limiter.get_remaining.assert_called_once_with(tenant_id)
+        service = ExecutionService(
+            mock_agent_service, mock_log_repository, mock_llm_provider, mock_rate_limiter
+        )
+
+        request = ExecutionRequest(prompt="Test", model="gpt-4o-mini")
+        result, remaining = await service.execute_agent(uuid4(), uuid4(), request)
+
+        assert remaining == 42

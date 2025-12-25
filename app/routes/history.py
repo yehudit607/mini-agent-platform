@@ -1,24 +1,15 @@
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.database import get_async_session
-from app.dependencies import get_current_tenant
+from app.dependencies import get_current_tenant, get_execution_log_repository
 from app.exceptions import ValidationError
 from app.repositories.execution_log_repository import ExecutionLogRepository
 from app.schemas.execution import HistoryItem, HistoryListResponse
 
 settings = get_settings()
 router = APIRouter()
-
-
-def get_log_repository(
-    session: AsyncSession = Depends(get_async_session),
-) -> ExecutionLogRepository:
-    return ExecutionLogRepository(session)
 
 
 @router.get(
@@ -39,7 +30,7 @@ async def get_history(
         description="Number of records to skip",
     ),
     tenant_id: UUID = Depends(get_current_tenant),
-    repository: ExecutionLogRepository = Depends(get_log_repository),
+    repository: ExecutionLogRepository = Depends(get_execution_log_repository),
 ) -> HistoryListResponse:
     if limit > settings.max_page_limit:
         raise ValidationError(

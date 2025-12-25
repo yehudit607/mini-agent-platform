@@ -2,7 +2,6 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DuplicateError, NotFoundError, DependencyError, ForbiddenError
 from app.models.tool import Tool
@@ -11,9 +10,15 @@ from app.schemas.tool import ToolCreate, ToolUpdate
 
 
 class ToolService:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-        self.repository = ToolRepository(session)
+    """Service for tool CRUD operations with tenant isolation."""
+
+    def __init__(self, tool_repository: ToolRepository):
+        """Initialize with injected repository.
+
+        Args:
+            tool_repository: Repository for tool data access.
+        """
+        self.repository = tool_repository
 
     async def create_tool(self, tenant_id: UUID, data: ToolCreate) -> Tool:
         existing = await self.repository.get_by_name(tenant_id, data.name)

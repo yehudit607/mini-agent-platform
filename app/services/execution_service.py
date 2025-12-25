@@ -1,8 +1,7 @@
 """Agent execution service."""
 
+from typing import Tuple
 from uuid import UUID
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.llm_provider import LLMProvider
 from app.config import get_settings
@@ -20,28 +19,51 @@ logger = setup_logger(__name__)
 class ExecutionService:
     """Service for executing agent prompts.
 
-    Uses Dependency Injection for LLMProvider and RateLimiter,
+    Uses Dependency Injection for all dependencies,
     enabling easy testing and swapping implementations.
     """
 
     def __init__(
         self,
-        session: AsyncSession,
+        agent_service: AgentService,
+        log_repository: ExecutionLogRepository,
         llm_provider: LLMProvider,
         rate_limiter: RateLimiter,
     ):
-        self.session = session
+        """Initialize with injected dependencies.
+
+        Args:
+            agent_service: Service for agent retrieval.
+            log_repository: Repository for execution logging.
+            llm_provider: Provider for LLM inference.
+            rate_limiter: Rate limiter for tenant quotas.
+        """
+        self.agent_service = agent_service
+        self.log_repository = log_repository
         self.llm_provider = llm_provider
         self.rate_limiter = rate_limiter
-        self.agent_service = AgentService(session)
-        self.log_repository = ExecutionLogRepository(session)
 
     async def execute_agent(
         self,
         tenant_id: UUID,
         agent_id: UUID,
         data: ExecutionRequest,
-    ) -> ExecutionResponse:
+    ) -> Tuple[ExecutionResponse, int]:
+        """Execute an agent with the given prompt.
+
+        Args:
+            tenant_id: Tenant making the request.
+            agent_id: Agent to execute.
+            data: Execution request with prompt and parameters.
+
+        Returns:
+            Tuple of (ExecutionResponse, rate_limit_remaining).
+
+        Raises:
+            RateLimitExceededError: If rate limit is exceeded.
+            ForbiddenError: If agent belongs to another tenant.
+            ValidationError: If model is not supported.
+        """
         rate_result = await self.rate_limiter.check_and_consume(tenant_id)
 
         if not rate_result.allowed:
@@ -97,7 +119,7 @@ class ExecutionService:
                 "Consider adding tools for enhanced capabilities."
             )
 
-        return ExecutionResponse(
+        response = ExecutionResponse(
             execution_id=log.id,
             agent_id=agent.id,
             agent_name=agent.name,
@@ -109,6 +131,4 @@ class ExecutionService:
             executed_at=log.created_at,
         )
 
-    async def get_remaining_rate_limit(self, tenant_id: UUID) -> int:
-        """Get remaining rate limit tokens for response headers."""
-        return await self.rate_limiter.get_remaining(tenant_id)
+        return response, rate_result.remaining
