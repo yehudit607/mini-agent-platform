@@ -7,8 +7,10 @@ import redis.asyncio as redis
 
 from app.config import get_settings
 from app.exceptions import RateLimitExceededError, ServiceUnavailableError
+from app.logging_config import setup_logger
 
 settings = get_settings()
+logger = setup_logger(__name__)
 
 # Atomic Lua script ensures all rate limit operations (cleanup, count, add) happen
 # in a single Redis transaction, preventing race conditions under concurrent requests
@@ -92,6 +94,13 @@ class RateLimiter:
             )
 
             allowed, remaining, retry_after = result
+
+            if not allowed:
+                logger.warning(
+                    f"Rate limit exceeded for tenant_id={tenant_id}, "
+                    f"retry_after={retry_after}s"
+                )
+
             return RateLimitResult(
                 allowed=bool(allowed),
                 remaining=int(remaining),

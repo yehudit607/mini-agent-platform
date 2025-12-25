@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.mock_llm import mock_llm_adapter
 from app.config import get_settings
 from app.exceptions import RateLimitExceededError, ValidationError
+from app.logging_config import setup_logger
 from app.models.agent import Agent
 from app.models.execution_log import ExecutionLog
 from app.repositories.execution_log_repository import ExecutionLogRepository
@@ -15,6 +16,7 @@ from app.services.agent_service import AgentService
 from app.services.rate_limiter import get_rate_limiter
 
 settings = get_settings()
+logger = setup_logger(__name__)
 
 
 class ExecutionService:
@@ -51,6 +53,11 @@ class ExecutionService:
                 },
             )
 
+        logger.info(
+            f"Starting agent execution: tenant_id={tenant_id}, "
+            f"agent_id={agent_id}, agent_name={agent.name}, model={data.model}"
+        )
+
         response_text = await mock_llm_adapter.generate(
             agent=agent,
             prompt=data.prompt,
@@ -65,6 +72,11 @@ class ExecutionService:
             prompt=data.prompt,
             model=data.model,
             response=response_text,
+        )
+
+        logger.info(
+            f"Completed agent execution: execution_id={log.id}, "
+            f"agent_name={agent.name}, response_length={len(response_text)}"
         )
 
         tool_names = [link.tool.name for link in agent.tool_links]
