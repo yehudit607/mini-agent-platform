@@ -31,9 +31,10 @@ MAP provides a secure, scalable foundation for multi-tenant AI agent orchestrati
 |------------|----------------|
 | **Multi-Tenancy** | Column-based `tenant_id` isolation with repository-level filtering |
 | **Async I/O** | Full async/await with SQLAlchemy 2.0 + asyncpg |
-| **Rate Limiting** | Redis sliding window (Lua scripts) - 100 req/min per tenant |
-| **AI-Ready** | Pluggable LLM adapter pattern (Mock implementation included) |
+| **Rate Limiting** | Redis sliding window (Lua scripts) with pluggable backends - 100 req/min per tenant |
+| **AI-Ready** | Abstract LLM provider interface with dependency injection (Mock implementation included) |
 | **Audit Trail** | Paginated execution history with tenant scoping |
+| **SOLID Principles** | Dependency injection, abstract interfaces, separation of concerns |
 
 ---
 
@@ -65,10 +66,16 @@ flowchart TB
         J[ExecutionLog Repository]
     end
 
+    subgraph Adapters
+        M[LLM Provider Interface]
+        N[RateLimitBackend Interface]
+    end
+
     subgraph Infrastructure
         K[(PostgreSQL)]
         L[(Redis)]
-        M[Mock LLM Adapter]
+        O[Mock LLM Implementation]
+        P[Redis Rate Limit Backend]
     end
 
     A -->|HTTP + X-API-KEY| B
@@ -80,9 +87,13 @@ flowchart TB
     F --> I
     G --> J
     G --> M
+    D --> N
+
+    M --> O
+    N --> P
 
     H & I & J -->|Async Queries| K
-    D -->|Sliding Window| L
+    P -->|Sliding Window| L
 ```
 ---
 
@@ -131,24 +142,39 @@ end
 
 ---
 
-### 3. Clean Architecture: Separation of Concerns
+### 3. SOLID Principles & Dependency Injection
 
+The codebase follows SOLID principles with comprehensive dependency injection:
+
+**Dependency Inversion Principle:**
+```python
+# Abstract interface for LLM providers
+class LLMProvider(ABC):
+    @abstractmethod
+    async def generate(self, agent, prompt, model, temperature, max_tokens) -> str:
+        pass
+
+# Services depend on abstractions, not concrete implementations
+class ExecutionService:
+    def __init__(self, session: AsyncSession,
+                 llm_provider: LLMProvider,  # ← Abstract interface
+                 rate_limiter: RateLimiter):
+        self.llm_provider = llm_provider
 ```
-Routes (HTTP) → Services (Business Logic) → Repositories (Data Access)
-```
-
-**Layer Responsibilities:**
-
-| Layer | Responsibility | Example |
-|-------|---------------|---------|
-| **Routes** | HTTP handling, request/response serialization | Validate input, return proper status codes |
-| **Services** | Business rules, orchestration | Check duplicates before create, validate cross-tenant tool access |
-| **Repositories** | Data access, query construction | All queries filtered by `tenant_id` |
 
 **Benefits:**
-- **Testability**: Services can be unit tested with mocked repositories
-- **Flexibility**: Swap PostgreSQL for another DB by changing only repositories
-- **Maintainability**: Business logic changes don't touch HTTP layer
+- **Testability**: Services accept mocked dependencies via constructor
+- **Flexibility**: Swap Redis for in-memory rate limiter without changing service code
+- **Open/Closed**: Add new LLM providers (OpenAI, Claude) without modifying ExecutionService
+
+**Architecture Layers:**
+```
+Routes → Services (DI) → Repositories → Database
+         ↓
+    Adapters (Abstract Interfaces)
+         ↓
+    Implementations (Redis, Mock LLM, etc.)
+```
 
 ---
 
@@ -325,6 +351,19 @@ All errors follow a consistent structure:
 
 ## Testing
 
+### Test Coverage
+
+The project includes **170+ comprehensive tests** covering:
+
+| Category | Files | Coverage |
+|----------|-------|----------|
+| **Unit Tests** | 10 files | All services, adapters, schemas, exceptions |
+| **Service Layer** | 70 tests | RateLimiter, AuthService, ExecutionService, AgentService, ToolService |
+| **Adapters** | 32 tests | MockLLMAdapter, InMemoryRateLimitBackend |
+| **Schemas** | 15 tests | Request validation, field constraints |
+| **Exceptions** | 27 tests | All exception classes and HTTP status codes |
+| **Integration** | API tests | Multi-tenant isolation, rate limiting |
+
 ### Run Full Test Suite
 
 ```bash
@@ -338,7 +377,7 @@ pytest tests/ -v --cov=app --cov-report=term-missing
 ### Test Categories
 
 ```bash
-# Unit tests only
+# Unit tests only (fast, no external dependencies)
 pytest tests/unit/ -v
 
 # Integration tests
@@ -348,6 +387,18 @@ pytest tests/integration/ -v
 pytest tests/contract/ -v
 ```
 
+### Example Unit Test (Service with Mocked Dependencies)
+
+```python
+@pytest.mark.asyncio
+async def test_execute_agent_checks_rate_limit(mock_session, mock_llm_provider, mock_rate_limiter):
+    service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
+
+    result = await service.execute_agent(tenant_id, agent_id, request)
+
+    mock_rate_limiter.check_and_consume.assert_called_once_with(tenant_id)
+```
+
 ---
 
 ## Project Structure
@@ -355,34 +406,46 @@ pytest tests/contract/ -v
 ```
 mini-agent-platform/
 ├── app/
-│   ├── main.py              # FastAPI application entry point
-│   ├── config.py            # Pydantic settings management
-│   ├── database.py          # Async SQLAlchemy engine & session
-│   ├── dependencies.py      # FastAPI dependency injection
-│   ├── exceptions.py        # Custom exception hierarchy
-│   ├── models/              # SQLModel entity definitions
-│   │   ├── base.py          # TenantModel base class
-│   │   ├── tenant.py        # Tenant entity
-│   │   ├── api_key.py       # API key with SHA-256 hashing
+│   ├── main.py                    # FastAPI application entry point
+│   ├── config.py                  # Pydantic settings management
+│   ├── database.py                # Async SQLAlchemy engine & session
+│   ├── dependencies.py            # FastAPI dependency injection factories
+│   ├── exceptions.py              # Custom exception hierarchy
+│   ├── logging_config.py          # Structured logging setup
+│   ├── models/                    # SQLModel entity definitions
+│   │   ├── base.py                # TenantModel base class
+│   │   ├── tenant.py              # Tenant entity
+│   │   ├── api_key.py             # API key with SHA-256 hashing
 │   │   ├── tool.py
 │   │   ├── agent.py
 │   │   └── execution_log.py
-│   ├── schemas/             # Pydantic request/response schemas
-│   ├── repositories/        # Data access layer (tenant-filtered)
-│   ├── services/            # Business logic layer
+│   ├── schemas/                   # Pydantic request/response schemas
+│   │   ├── execution.py           # Includes temperature, max_tokens
+│   │   └── ...
+│   ├── repositories/              # Data access layer (tenant-filtered)
+│   ├── services/                  # Business logic layer
 │   │   ├── tool_service.py
 │   │   ├── agent_service.py
-│   │   ├── execution_service.py
-│   │   ├── auth_service.py  # API key validation
-│   │   └── rate_limiter.py  # Redis sliding window implementation
-│   ├── routes/              # API endpoint handlers
-│   ├── middleware/          # Auth & error handling
-│   └── adapters/            # External service adapters (Mock LLM)
-├── alembic/                 # Database migrations
-├── scripts/
-│   └── rate_limiter.lua     # Atomic rate limiting script
+│   │   ├── execution_service.py   # DI with LLMProvider & RateLimiter
+│   │   ├── auth_service.py        # API key validation
+│   │   ├── rate_limiter.py        # Rate limiter with pluggable backend
+│   │   ├── rate_limit_backend.py  # Abstract interface
+│   │   ├── rate_limit_redis.py    # Redis implementation
+│   │   └── rate_limit_memory.py   # In-memory for testing
+│   ├── routes/                    # API endpoint handlers
+│   ├── middleware/                # Global exception handlers
+│   └── adapters/                  # External service adapters
+│       ├── llm_provider.py        # Abstract LLM interface
+│       └── mock_llm.py            # Mock implementation
+├── alembic/                       # Database migrations
 ├── tests/
-│   ├── unit/
+│   ├── unit/                      # 170+ tests covering all services
+│   │   ├── test_rate_limiter.py
+│   │   ├── test_auth_service.py
+│   │   ├── test_execution_service.py
+│   │   ├── test_agent_service.py
+│   │   ├── test_tool_service.py
+│   │   └── ...
 │   ├── integration/
 │   └── contract/
 ├── docker-compose.yml
@@ -408,16 +471,40 @@ The following models are accepted by the `/run` endpoint:
 
 ---
 
+## Logging
+
+The platform includes structured logging with automatic traceback capture:
+
+```python
+# All exception handlers use logger.exception() for full traceback
+try:
+    await redis_client.ping()
+except Exception:
+    logger.exception("Redis connection failed")  # Includes full stack trace
+    raise ServiceUnavailableError(...)
+```
+
+**Logged Events:**
+- Authentication attempts (success/failure)
+- Rate limit violations
+- Agent execution start/completion
+- Database transaction failures
+- All unexpected exceptions with full tracebacks
+
+Logs are written to `logs/app.log` with format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
+
+---
+
 ## Production Considerations
 
 The following features were intentionally scoped out of this demo but would be essential for production deployment:
 
-| Category | Features |
-|----------|----------|
-| **Observability** | Structured JSON logging, Prometheus metrics, distributed tracing (OpenTelemetry) |
-| **Security** | API key rotation, IP whitelisting per key, comprehensive audit logging |
-| **Scaling** | Async execution queue (Celery/RQ), database read replicas, connection pooling tuning |
-| **Reliability** | Circuit breakers for LLM calls, retry policies with exponential backoff, request timeout enforcement |
+| Category | Features | Current Status |
+|----------|----------|----------------|
+| **Observability** | Prometheus metrics, distributed tracing (OpenTelemetry), log aggregation | Structured logging with traceback capture |
+| **Security** | API key rotation, IP whitelisting per key, comprehensive audit logging | SHA-256 key hashing, last_used_at tracking |
+| **Scaling** | Async execution queue (Celery/RQ), database read replicas, connection pooling tuning | Async I/O throughout |
+| **Reliability** | Circuit breakers for LLM calls, retry policies with exponential backoff, request timeout enforcement | Rate limiting, fail-safe error handling |
 
 ---
 
