@@ -377,7 +377,7 @@ pytest tests/ -v --cov=app --cov-report=term-missing
 ### Test Categories
 
 ```bash
-# Unit tests only (fast, no external dependencies)
+# Unit tests only 
 pytest tests/unit/ -v
 
 # Integration tests
@@ -385,18 +385,6 @@ pytest tests/integration/ -v
 
 # Contract tests (API behavior)
 pytest tests/contract/ -v
-```
-
-### Example Unit Test (Service with Mocked Dependencies)
-
-```python
-@pytest.mark.asyncio
-async def test_execute_agent_checks_rate_limit(mock_session, mock_llm_provider, mock_rate_limiter):
-    service = ExecutionService(mock_session, mock_llm_provider, mock_rate_limiter)
-
-    result = await service.execute_agent(tenant_id, agent_id, request)
-
-    mock_rate_limiter.check_and_consume.assert_called_once_with(tenant_id)
 ```
 
 ---
@@ -475,15 +463,6 @@ The following models are accepted by the `/run` endpoint:
 
 The platform includes structured logging with automatic traceback capture:
 
-```python
-# All exception handlers use logger.exception() for full traceback
-try:
-    await redis_client.ping()
-except Exception:
-    logger.exception("Redis connection failed")  # Includes full stack trace
-    raise ServiceUnavailableError(...)
-```
-
 **Logged Events:**
 - Authentication attempts (success/failure)
 - Rate limit violations
@@ -492,19 +471,6 @@ except Exception:
 - All unexpected exceptions with full tracebacks
 
 Logs are written to `logs/app.log` with format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
-
----
-
-## Production Considerations
-
-The following features were intentionally scoped out of this demo but would be essential for production deployment:
-
-| Category | Features | Current Status |
-|----------|----------|----------------|
-| **Observability** | Prometheus metrics, distributed tracing (OpenTelemetry), log aggregation | Structured logging with traceback capture |
-| **Security** | API key rotation, IP whitelisting per key, comprehensive audit logging | SHA-256 key hashing, last_used_at tracking |
-| **Scaling** | Async execution queue (Celery/RQ), database read replicas, connection pooling tuning | Async I/O throughout |
-| **Reliability** | Circuit breakers for LLM calls, retry policies with exponential backoff, request timeout enforcement | Rate limiting, fail-safe error handling |
 
 ---
 
