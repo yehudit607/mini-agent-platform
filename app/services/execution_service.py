@@ -39,7 +39,7 @@ class ExecutionService:
                 window_seconds=settings.rate_limit_window_seconds,
             )
 
-        agent = await self.agent_service.get_agent_or_forbidden(tenant_id, agent_id)
+        agent = await self.agent_service.get_agent_for_execution(tenant_id, agent_id)
 
         if data.model not in settings.allowed_models:
             raise ValidationError(

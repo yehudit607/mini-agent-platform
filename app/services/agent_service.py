@@ -60,10 +60,9 @@ class AgentService:
             )
         return agent
 
-    async def get_agent_or_forbidden(
+    async def get_agent_for_execution(
         self, tenant_id: UUID, agent_id: UUID
     ) -> Agent:
-        """Returns 403 instead of 404 to prevent tenant resource enumeration."""
         agent = await self.repository.get_by_id(tenant_id, agent_id)
         if agent is None:
             raise ForbiddenError(
