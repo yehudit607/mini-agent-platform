@@ -351,19 +351,6 @@ All errors follow a consistent structure:
 
 ## Testing
 
-### Test Coverage
-
-The project includes **170+ comprehensive tests** covering:
-
-| Category | Files | Coverage |
-|----------|-------|----------|
-| **Unit Tests** | 10 files | All services, adapters, schemas, exceptions |
-| **Service Layer** | 70 tests | RateLimiter, AuthService, ExecutionService, AgentService, ToolService |
-| **Adapters** | 32 tests | MockLLMAdapter, InMemoryRateLimitBackend |
-| **Schemas** | 15 tests | Request validation, field constraints |
-| **Exceptions** | 27 tests | All exception classes and HTTP status codes |
-| **Integration** | API tests | Multi-tenant isolation, rate limiting |
-
 ### Run Full Test Suite
 
 ```bash
