@@ -107,9 +107,8 @@ class RateLimiter:
                 retry_after=int(retry_after),
             )
 
-        except ServiceUnavailableError:
-            raise
         except Exception as e:
+            logger.error(f"Rate limiter error: {str(e)}")
             raise ServiceUnavailableError(
                 error_code="SERVICE_UNAVAILABLE",
                 message="Rate limiting service temporarily unavailable",
