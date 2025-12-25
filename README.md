@@ -142,31 +142,6 @@ end
 
 ---
 
-### 3. SOLID Principles & Dependency Injection
-
-The codebase follows SOLID principles with comprehensive dependency injection:
-
-**Dependency Inversion Principle:**
-```python
-# Abstract interface for LLM providers
-class LLMProvider(ABC):
-    @abstractmethod
-    async def generate(self, agent, prompt, model, temperature, max_tokens) -> str:
-        pass
-
-# Services depend on abstractions, not concrete implementations
-class ExecutionService:
-    def __init__(self, session: AsyncSession,
-                 llm_provider: LLMProvider,  # ← Abstract interface
-                 rate_limiter: RateLimiter):
-        self.llm_provider = llm_provider
-```
-
-**Benefits:**
-- **Testability**: Services accept mocked dependencies via constructor
-- **Flexibility**: Swap Redis for in-memory rate limiter without changing service code
-- **Open/Closed**: Add new LLM providers (OpenAI, Claude) without modifying ExecutionService
-
 **Architecture Layers:**
 ```
 Routes → Services (DI) → Repositories → Database
